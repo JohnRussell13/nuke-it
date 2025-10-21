@@ -1,25 +1,54 @@
-const socket = new WebSocket('ws://localhost:3000/ws');
+let ws = null;
+const logEl = document.getElementById("log");
 
-socket.addEventListener('open', function (event) {
-    socket.send('Hello Server!');
-});
+function log(msg) {
+  console.log(msg);
+  logEl.textContent += msg + "\n";
+  logEl.scrollTop = logEl.scrollHeight;
+}
 
-socket.addEventListener('message', function (event) {
-    console.log('Message from server ', event.data);
-});
+document.getElementById("connectBtn").onclick = () => {
+  if (ws) {
+    log("Already connected");
+    return;
+  }
+  ws = new WebSocket("ws://127.0.0.1:3000/ws");
 
+  ws.onopen = () => log("WebSocket connected");
+  ws.onmessage = (event) => log("Received: " + event.data);
+  ws.onclose = () => {
+    log("WebSocket disconnected");
+    ws = null;
+  };
+  ws.onerror = (err) => log("WebSocket error: " + err);
+};
 
-setTimeout(() => {
-    const obj = { hello: "world" };
-    const blob = new Blob([JSON.stringify(obj, null, 2)], {
-      type: "application/json",
-    });
-    console.log("Sending blob over websocket");
-    socket.send(blob);
-}, 1000);
+document.getElementById("spinBtn").onclick = () => {
+  if (!ws) {
+    log("Not connected");
+    return;
+  }
+  const msg = { action: "spin", id: 123 };
+  ws.send(JSON.stringify(msg));
+  log("Sent: " + JSON.stringify(msg));
+};
 
-setTimeout(() => {
-    socket.send('About done here...');
-    console.log("Sending close over websocket");
-    socket.close(3000, "Crash and Burn!");
-}, 3000);
+document.getElementById("fetchBtn").onclick = () => {
+  if (!ws) {
+    log("Not connected");
+    return;
+  }
+  const msg = { action: "fetch" };
+  ws.send(JSON.stringify(msg));
+  log("Sent: " + JSON.stringify(msg));
+};
+
+document.getElementById("disconnectBtn").onclick = () => {
+  if (!ws) {
+    log("Not connected");
+    return;
+  }
+  ws.close();
+  ws = null;
+};
+

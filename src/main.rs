@@ -53,17 +53,15 @@ async fn ws_handler(
 async fn handle_socket(socket: WebSocket, who: SocketAddr) {
     let (mut sender, mut receiver) = socket.split();
 
-    tokio::spawn(async move {
-        while let Some(Ok(msg)) = receiver.next().await {
-            // print message and break if instructed to do so
-            if service::process_message(msg, who, &mut sender)
-                .await
-                .is_break()
-            {
-                break;
-            }
+    // Run the main loop inline so we can know when it ends
+    while let Some(Ok(msg)) = receiver.next().await {
+        if service::process_message(msg, who, &mut sender)
+            .await
+            .is_break()
+        {
+            break;
         }
-    });
+    }
 
     println!("Websocket context {who} destroyed");
 }

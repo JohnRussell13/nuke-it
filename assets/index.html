@@ -1,2 +1,24 @@
-<a>Open the console to see stuff, then refresh to initiate exchange.</a>
-<script src='script.js'></script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebSocket Game Test</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        button { margin: 5px; }
+        #log { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Game Test</h1>
+    <button id="connectBtn">Connect</button>
+    <button id="spinBtn">Spin</button>
+    <button id="fetchBtn">Fetch</button>
+    <button id="disconnectBtn">Disconnect</button>
+
+    <h2>Log</h2>
+    <div id="log"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

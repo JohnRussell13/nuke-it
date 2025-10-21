@@ -22,7 +22,7 @@ pub async fn process_message(
             let response = dispatch(package);
 
             if sender.send(Message::Text(response.into())).await.is_err() {
-                eprintln!("Error sending message");
+                eprintln!("Error sending message to {who}");
             }
         }
         Message::Binary(d) => {
