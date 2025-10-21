@@ -7,7 +7,8 @@ use std::{net::SocketAddr, sync::Arc};
 
 use futures_util::sink::SinkExt;
 
-use crate::service::types::{ClientPayload, ResponsePayload};
+use crate::service::types::{ClientPayload, ResponsePayload, ServerMessage};
+use crate::types::SharedClients;
 
 mod fetch;
 mod spin;
@@ -17,19 +18,27 @@ pub async fn process_message(
     msg: Message,
     who: SocketAddr,
     sender: &Arc<Mutex<SplitSink<WebSocket, Message>>>,
+    clients: SharedClients,
 ) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
-            let package = t.as_str();
-            let response = dispatch(package);
-
-            let mut locked_sender = sender.lock().await;
-            if locked_sender
-                .send(Message::Text(response.into()))
-                .await
-                .is_err()
             {
-                eprintln!("Error sending message to {who}");
+                let package = t.as_str();
+                let response = dispatch(package);
+
+                let mut locked_sender = sender.lock().await;
+                if locked_sender
+                    .send(Message::Text(response.into()))
+                    .await
+                    .is_err()
+                {
+                    eprintln!("Error sending message to {who}");
+                }
+            }
+
+            {
+                let response = types::ok(ResponsePayload::Fetch(fetch::run()));
+                broadcast(&clients, response).await;
             }
         }
         Message::Binary(d) => {
@@ -61,7 +70,6 @@ fn dispatch(req_raw: &str) -> String {
 
     let res_json = match req_json {
         ClientPayload::Spin { id } => types::ok(ResponsePayload::Spin(spin::run(id))),
-        ClientPayload::Fetch {} => types::ok(ResponsePayload::Fetch(fetch::run())),
     };
 
     let res_raw = match serde_json::to_string(&res_json) {
@@ -73,4 +81,20 @@ fn dispatch(req_raw: &str) -> String {
     };
 
     res_raw
+}
+
+async fn broadcast(clients: &SharedClients, res_json: ServerMessage<ResponsePayload>) {
+    let res_raw = match serde_json::to_string(&res_json) {
+        Ok(json) => json,
+        Err(_) => {
+            return;
+        }
+    };
+
+    let locked = clients.lock().await;
+
+    for sender in locked.iter() {
+        let mut sink = sender.lock().await;
+        let _ = sink.send(Message::Text(res_raw.clone().into())).await;
+    }
 }

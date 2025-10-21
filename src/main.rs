@@ -1,6 +1,6 @@
 use axum::{
     Router,
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    extract::ws::{WebSocket, WebSocketUpgrade},
     response::IntoResponse,
     routing::any,
 };
@@ -12,13 +12,12 @@ use tower_http::services::ServeDir;
 
 use axum::extract::connect_info::ConnectInfo;
 
-use futures_util::SinkExt;
-use futures_util::stream::{SplitSink, StreamExt};
+use futures_util::stream::StreamExt;
+
+use crate::types::SharedClients;
 
 mod service;
-
-type Tx = Arc<Mutex<SplitSink<WebSocket, Message>>>;
-type SharedClients = Arc<Mutex<Vec<Tx>>>;
+mod types;
 
 #[tokio::main]
 async fn main() {
@@ -68,9 +67,8 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, clients: SharedClient
 
     while let Some(Ok(msg)) = receiver.next().await {
         let sender_clone = sender.clone();
-        let msg_clone = msg.clone();
 
-        if service::process_message(msg_clone, who, &sender_clone)
+        if service::process_message(msg, who, &sender_clone, clients.clone())
             .await
             .is_break()
         {
@@ -84,13 +82,4 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr, clients: SharedClient
     }
 
     println!("WebSocket {who} disconnected");
-}
-
-async fn broadcast(clients: &SharedClients, msg: &str) {
-    let locked = clients.lock().await;
-
-    for sender in locked.iter() {
-        let mut sink = sender.lock().await;
-        let _ = sink.send(Message::Text(msg.to_string().into())).await;
-    }
 }

@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "action", rename_all = "lowercase")]
 pub enum ClientPayload {
     Spin { id: u32 },
-    Fetch {/* optional fields later */},
 }
 
 #[derive(Serialize, Debug)]
