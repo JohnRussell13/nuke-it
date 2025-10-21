@@ -1,3 +1,7 @@
-pub fn run() -> Result<String, String> {
-    Ok("Hello".to_string())
+use crate::service::types::FetchResponse;
+
+pub fn run() -> FetchResponse {
+    FetchResponse {
+        items: vec!["item1".into(), "item2".into()],
+    }
 }

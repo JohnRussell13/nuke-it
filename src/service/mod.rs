@@ -5,8 +5,11 @@ use std::ops::ControlFlow;
 
 use futures_util::{Sink, sink::SinkExt};
 
+use crate::service::types::{ClientPayload, ResponsePayload};
+
 mod fetch;
 mod spin;
+mod types;
 
 pub async fn process_message(
     msg: Message,
@@ -16,11 +19,7 @@ pub async fn process_message(
     match msg {
         Message::Text(t) => {
             let package = t.as_str();
-
-            let response = match dispatch(package) {
-                Ok(s) => format!("OK,{s}"),
-                Err(s) => format!("ERR,{s}"),
-            };
+            let response = dispatch(package);
 
             if sender.send(Message::Text(response.into())).await.is_err() {
                 eprintln!("Error sending message");
@@ -42,11 +41,29 @@ pub async fn process_message(
     ControlFlow::Continue(())
 }
 
-fn dispatch(package: &str) -> Result<String, String> {
-    let package_parts: Vec<&str> = package.split(",").collect();
-    match package_parts[0] {
-        "spin" => spin::run(package_parts),
-        "fetch" => fetch::run(),
-        _ => Err(format!("Unknown action: {package_parts:?}")),
-    }
+fn dispatch(req_raw: &str) -> String {
+    let req_json: Result<ClientPayload, _> = serde_json::from_str(req_raw);
+
+    let req_json = match req_json {
+        Ok(m) => m,
+        Err(_) => {
+            let err_msg = types::create_error("Bad message format!");
+            return serde_json::to_string(&err_msg).unwrap();
+        }
+    };
+
+    let res_json = match req_json {
+        ClientPayload::Spin { id } => types::ok(ResponsePayload::Spin(spin::run(id))),
+        ClientPayload::Fetch {} => types::ok(ResponsePayload::Fetch(fetch::run())),
+    };
+
+    let res_raw = match serde_json::to_string(&res_json) {
+        Ok(json) => json,
+        Err(_) => {
+            let err_msg = types::create_error("Server error!");
+            return serde_json::to_string(&err_msg).unwrap();
+        }
+    };
+
+    res_raw
 }

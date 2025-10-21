@@ -8,6 +8,8 @@ axum = { version = "0.8.6", features = ["ws"] }
 axum-extra = { version = "0.10.3", features = ["typed-header"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["sink", "std"] }
 headers = "0.4.1"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
 tokio = { version = "1.48.0", features = ["full"] }
 tokio-tungstenite = "0.28.0"
 tower-http = { version = "0.6.6", features = ["fs", "trace"] }
