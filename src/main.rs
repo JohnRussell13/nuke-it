@@ -1,18 +1,19 @@
 use axum::{
     Router,
-    extract::ws::{Message, WebSocket, WebSocketUpgrade},
+    extract::ws::{WebSocket, WebSocketUpgrade},
     response::IntoResponse,
     routing::any,
 };
 use axum_extra::TypedHeader;
 
-use std::ops::ControlFlow;
 use std::{net::SocketAddr, path::PathBuf};
 use tower_http::services::ServeDir;
 
 use axum::extract::connect_info::ConnectInfo;
 
-use futures_util::{Sink, sink::SinkExt, stream::StreamExt};
+use futures_util::stream::StreamExt;
+
+mod service;
 
 #[tokio::main]
 async fn main() {
@@ -55,51 +56,14 @@ async fn handle_socket(socket: WebSocket, who: SocketAddr) {
     tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
             // print message and break if instructed to do so
-            if process_message(msg, who, &mut sender).await.is_break() {
+            if service::process_message(msg, who, &mut sender)
+                .await
+                .is_break()
+            {
                 break;
             }
         }
     });
 
     println!("Websocket context {who} destroyed");
-}
-
-async fn process_message(
-    msg: Message,
-    who: SocketAddr,
-    sender: &mut (impl Sink<Message> + Unpin),
-) -> ControlFlow<(), ()> {
-    match msg {
-        Message::Text(t) => {
-            println!(">>> {who} sent str: {t:?}");
-            if sender
-                .send(Message::Text("My code".to_string().into()))
-                .await
-                .is_err()
-            {
-                eprintln!("Error sending message");
-            }
-        }
-        Message::Binary(d) => {
-            println!(">>> {who} sent {} bytes: {d:?}", d.len());
-        }
-        Message::Close(c) => {
-            if let Some(cf) = c {
-                println!(
-                    ">>> {who} sent close with code {} and reason `{}`",
-                    cf.code, cf.reason
-                );
-            } else {
-                println!(">>> {who} somehow sent close message without CloseFrame");
-            }
-            return ControlFlow::Break(());
-        }
-        Message::Pong(v) => {
-            println!(">>> {who} sent pong with {v:?}");
-        }
-        Message::Ping(v) => {
-            println!(">>> {who} sent ping with {v:?}");
-        }
-    }
-    ControlFlow::Continue(())
 }
