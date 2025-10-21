@@ -1,9 +1,11 @@
-use axum::extract::ws::Message;
+use axum::extract::ws::{Message, WebSocket};
+use futures_util::stream::SplitSink;
+use tokio::sync::Mutex;
 
-use std::net::SocketAddr;
 use std::ops::ControlFlow;
+use std::{net::SocketAddr, sync::Arc};
 
-use futures_util::{Sink, sink::SinkExt};
+use futures_util::sink::SinkExt;
 
 use crate::service::types::{ClientPayload, ResponsePayload};
 
@@ -14,14 +16,19 @@ mod types;
 pub async fn process_message(
     msg: Message,
     who: SocketAddr,
-    sender: &mut (impl Sink<Message> + Unpin),
+    sender: &Arc<Mutex<SplitSink<WebSocket, Message>>>,
 ) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
             let package = t.as_str();
             let response = dispatch(package);
 
-            if sender.send(Message::Text(response.into())).await.is_err() {
+            let mut locked_sender = sender.lock().await;
+            if locked_sender
+                .send(Message::Text(response.into()))
+                .await
+                .is_err()
+            {
                 eprintln!("Error sending message to {who}");
             }
         }
