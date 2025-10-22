@@ -1,4 +1,4 @@
-use axum::extract::ws::{Message, WebSocket};
+use axum::extract::ws::{Message, Utf8Bytes, WebSocket};
 use futures_util::stream::SplitSink;
 use tokio::sync::Mutex;
 use tokio_postgres::Client;
@@ -23,24 +23,9 @@ pub async fn process_message(
     db_client: Arc<Mutex<Client>>,
 ) -> ControlFlow<(), ()> {
     match msg {
-        Message::Text(t) => {
-            {
-                let package = t.as_str();
-                let response = dispatch(package);
-
-                let mut locked_sender = sender.lock().await;
-                if locked_sender
-                    .send(Message::Text(response.into()))
-                    .await
-                    .is_err()
-                {
-                    eprintln!("Error sending message to {who}");
-                }
-            }
-
-            {
-                broadcast(&ws_clients, fetch::run(db_client).await).await;
-            }
+        Message::Text(package) => {
+            dispatch(package, sender, db_client.clone()).await;
+            broadcast(&ws_clients, fetch::run(db_client.clone()).await).await;
         }
         Message::Binary(d) => {
             println!(">>> {who} sent {} bytes: {d:?}", d.len());
@@ -58,30 +43,55 @@ pub async fn process_message(
     ControlFlow::Continue(())
 }
 
-fn dispatch(req_raw: &str) -> String {
+async fn dispatch(
+    package: Utf8Bytes,
+    sender: &Arc<Mutex<SplitSink<WebSocket, Message>>>,
+    db_client: Arc<Mutex<Client>>,
+) {
+    let req_raw = package.as_str();
     let req_json: Result<ClientPayload, _> = serde_json::from_str(req_raw);
 
     let req_json = match req_json {
         Ok(m) => m,
-        Err(_) => {
-            let err_msg = types::create_error(String::from("Bad message format!"));
-            return serde_json::to_string(&err_msg).unwrap();
+        Err(e) => {
+            let err_msg = types::create_error(format!("Bad message format: {e:?}"));
+            let data = serde_json::to_string(&err_msg).unwrap();
+            send(sender, data).await;
+            return;
         }
     };
 
     let res_json = match req_json {
-        ClientPayload::Spin { id } => types::ok(ResponsePayload::Spin(spin::run(id))),
+        ClientPayload::Spin {
+            wallet_id,
+            player_id,
+            amount,
+        } => spin::run(wallet_id, player_id, amount, db_client).await,
+        ClientPayload::Fetch {} => return,
     };
 
     let res_raw = match serde_json::to_string(&res_json) {
         Ok(json) => json,
         Err(_) => {
             let err_msg = types::create_error(String::from("Server error!"));
-            return serde_json::to_string(&err_msg).unwrap();
+            let data = serde_json::to_string(&err_msg).unwrap();
+            send(sender, data).await;
+            return;
         }
     };
 
-    res_raw
+    send(sender, res_raw).await;
+}
+
+async fn send(sender: &Arc<Mutex<SplitSink<WebSocket, Message>>>, data: String) {
+    let mut locked_sender = sender.lock().await;
+    if locked_sender
+        .send(Message::Text(data.into()))
+        .await
+        .is_err()
+    {
+        eprintln!("Error sending message to");
+    }
 }
 
 async fn broadcast(ws_clients: &SharedClients, res_json: ServerMessage<ResponsePayload>) {

@@ -4,7 +4,12 @@ use tokio_postgres::Row;
 #[derive(Deserialize, Debug)]
 #[serde(tag = "action", rename_all = "lowercase")]
 pub enum ClientPayload {
-    Spin { id: u32 },
+    Spin {
+        wallet_id: String,
+        player_id: i32,
+        amount: f64,
+    },
+    Fetch {},
 }
 
 #[derive(Serialize, Debug)]
@@ -24,7 +29,7 @@ pub enum ResponsePayload {
 
 #[derive(Serialize, Debug)]
 pub struct SpinResponse {
-    pub outcome: u32,
+    pub outcome: i32,
 }
 
 #[derive(Serialize, Debug)]

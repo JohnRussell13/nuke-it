@@ -28,7 +28,7 @@ document.getElementById("spinBtn").onclick = () => {
     log("Not connected");
     return;
   }
-  const msg = { action: "spin", id: 123 };
+  const msg = { action: "spin", wallet_id: "123", player_id: 1, amount: 1.3 };
   ws.send(JSON.stringify(msg));
   log("Sent: " + JSON.stringify(msg));
 };
@@ -51,4 +51,3 @@ document.getElementById("disconnectBtn").onclick = () => {
   ws.close();
   ws = null;
 };
-

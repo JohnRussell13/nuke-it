@@ -16,7 +16,23 @@ CREATE TABLE rolls (
     game_id INT REFERENCES games(id),
     wallet_id TEXT NOT NULL CHECK (wallet_id <> ''),
     player_id INT REFERENCES players(id),
-    amount DOUBLE PRECISION NOT NULL CHECK (amount > 0);
+    amount DOUBLE PRECISION NOT NULL CHECK (amount > 0),
     roll INT NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
 );
+
+CREATE OR REPLACE FUNCTION check_game_active() RETURNS trigger AS $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM games WHERE id = NEW.game_id AND status = 'active'
+    ) THEN
+        RAISE EXCEPTION 'Cannot insert roll: game is not active';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER rolls_game_active_check
+BEFORE INSERT ON rolls
+FOR EACH ROW
+EXECUTE FUNCTION check_game_active();
