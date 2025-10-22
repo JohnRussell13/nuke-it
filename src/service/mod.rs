@@ -1,6 +1,7 @@
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::stream::SplitSink;
 use tokio::sync::Mutex;
+use tokio_postgres::Client;
 
 use std::ops::ControlFlow;
 use std::{net::SocketAddr, sync::Arc};
@@ -18,7 +19,8 @@ pub async fn process_message(
     msg: Message,
     who: SocketAddr,
     sender: &Arc<Mutex<SplitSink<WebSocket, Message>>>,
-    clients: SharedClients,
+    ws_clients: SharedClients,
+    db_client: Arc<Mutex<Client>>,
 ) -> ControlFlow<(), ()> {
     match msg {
         Message::Text(t) => {
@@ -37,8 +39,7 @@ pub async fn process_message(
             }
 
             {
-                let response = types::ok(ResponsePayload::Fetch(fetch::run()));
-                broadcast(&clients, response).await;
+                broadcast(&ws_clients, fetch::run(db_client).await).await;
             }
         }
         Message::Binary(d) => {
@@ -63,7 +64,7 @@ fn dispatch(req_raw: &str) -> String {
     let req_json = match req_json {
         Ok(m) => m,
         Err(_) => {
-            let err_msg = types::create_error("Bad message format!");
+            let err_msg = types::create_error(String::from("Bad message format!"));
             return serde_json::to_string(&err_msg).unwrap();
         }
     };
@@ -75,7 +76,7 @@ fn dispatch(req_raw: &str) -> String {
     let res_raw = match serde_json::to_string(&res_json) {
         Ok(json) => json,
         Err(_) => {
-            let err_msg = types::create_error("Server error!");
+            let err_msg = types::create_error(String::from("Server error!"));
             return serde_json::to_string(&err_msg).unwrap();
         }
     };
@@ -83,7 +84,7 @@ fn dispatch(req_raw: &str) -> String {
     res_raw
 }
 
-async fn broadcast(clients: &SharedClients, res_json: ServerMessage<ResponsePayload>) {
+async fn broadcast(ws_clients: &SharedClients, res_json: ServerMessage<ResponsePayload>) {
     let res_raw = match serde_json::to_string(&res_json) {
         Ok(json) => json,
         Err(_) => {
@@ -91,7 +92,7 @@ async fn broadcast(clients: &SharedClients, res_json: ServerMessage<ResponsePayl
         }
     };
 
-    let locked = clients.lock().await;
+    let locked = ws_clients.lock().await;
 
     for sender in locked.iter() {
         let mut sink = sender.lock().await;
