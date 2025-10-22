@@ -6,6 +6,7 @@ use tokio_postgres::Row;
 pub enum ClientPayload {
     Spin {
         wallet_id: String,
+        game_id: i32,
         player_id: i32,
         amount: f64,
     },

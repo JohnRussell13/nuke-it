@@ -64,9 +64,10 @@ async fn dispatch(
     let res_json = match req_json {
         ClientPayload::Spin {
             wallet_id,
+            game_id,
             player_id,
             amount,
-        } => spin::run(wallet_id, player_id, amount, db_client).await,
+        } => spin::run(wallet_id, game_id, player_id, amount, db_client).await,
         ClientPayload::Fetch {} => return,
     };
 

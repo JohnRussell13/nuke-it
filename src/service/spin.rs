@@ -10,11 +10,11 @@ use crate::service::types::{self, ResponsePayload, ServerMessage, SpinResponse};
 pub async fn run(
     wallet_id: String,
     player_id: i32,
+    game_id: i32,
     amount: f64,
     db_client: Arc<Mutex<Client>>,
 ) -> ServerMessage<ResponsePayload> {
     let outcome = roll();
-    let game_id = 1;
 
     let query = "
         INSERT INTO rolls (game_id, wallet_id, player_id, amount, roll) VALUES

@@ -1,24 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>WebSocket Game Test</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; }
-        button { margin: 5px; }
-        #log { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; white-space: pre-wrap; }
-    </style>
+  <meta charset="UTF-8">
+  <title>WebSocket Game Test</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; }
+    button { margin: 5px; }
+    label { display: block; margin-top: 10px; }
+    input { width: 100%; padding: 4px; margin-top: 4px; }
+    #log { border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto; white-space: pre-wrap; }
+  </style>
 </head>
 <body>
-    <h1>WebSocket Game Test</h1>
+  <h1>WebSocket Game Test</h1>
+
+  <div>
+    <label>Wallet ID:
+      <input type="text" id="walletId" placeholder="e.g. wallet_abc123">
+    </label>
+    <label>Game ID:
+      <input type="number" id="gameId" placeholder="e.g. 101">
+    </label>
+    <label>Player ID:
+      <input type="number" id="playerId" placeholder="e.g. 1">
+    </label>
+    <label>Amount:
+      <input type="number" id="amount" placeholder="e.g. 50">
+    </label>
+  </div>
+
+  <div style="margin-top: 10px;">
     <button id="connectBtn">Connect</button>
     <button id="spinBtn">Spin</button>
     <button id="fetchBtn">Fetch</button>
     <button id="disconnectBtn">Disconnect</button>
+  </div>
 
-    <h2>Log</h2>
-    <div id="log"></div>
+  <h2>Log</h2>
+  <div id="log"></div>
 
-    <script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
