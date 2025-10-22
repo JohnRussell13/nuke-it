@@ -1,5 +1,7 @@
 use std::sync::Arc;
 
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 use tokio::sync::Mutex;
 use tokio_postgres::Client;
 
@@ -11,7 +13,7 @@ pub async fn run(
     amount: f64,
     db_client: Arc<Mutex<Client>>,
 ) -> ServerMessage<ResponsePayload> {
-    let outcome = 42; // example outcome
+    let outcome = roll();
     let game_id = 1;
 
     let query = "
@@ -34,4 +36,9 @@ pub async fn run(
         }
         Err(msg) => return types::create_error(format!("Bad insert query: {}", msg.to_string())),
     };
+}
+
+pub fn roll() -> i32 {
+    let mut rng = ChaCha20Rng::from_os_rng();
+    rng.random_range(1..=6)
 }
