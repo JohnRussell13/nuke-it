@@ -23,10 +23,10 @@ pub async fn process_message(
     db_client: Arc<Mutex<Client>>,
 ) -> ControlFlow<(), ()> {
     match msg {
-        Message::Text(package) => {
-            dispatch(package, sender, db_client.clone()).await;
-            broadcast(&ws_clients, fetch::run(db_client.clone()).await).await;
-        }
+        Message::Text(package) => match dispatch(package, db_client.clone(), ws_clients).await {
+            Some(data) => send(sender, data).await,
+            None => (),
+        },
         Message::Binary(d) => {
             println!(">>> {who} sent {} bytes: {d:?}", d.len());
         }
@@ -45,9 +45,9 @@ pub async fn process_message(
 
 async fn dispatch(
     package: Utf8Bytes,
-    sender: &Arc<Mutex<SplitSink<WebSocket, Message>>>,
     db_client: Arc<Mutex<Client>>,
-) {
+    ws_clients: SharedClients,
+) -> Option<String> {
     let req_raw = package.as_str();
     let req_json: Result<ClientPayload, _> = serde_json::from_str(req_raw);
 
@@ -56,8 +56,7 @@ async fn dispatch(
         Err(e) => {
             let err_msg = types::create_error(format!("Bad message format: {e:?}"));
             let data = serde_json::to_string(&err_msg).unwrap();
-            send(sender, data).await;
-            return;
+            return Some(data);
         }
     };
 
@@ -67,8 +66,12 @@ async fn dispatch(
             game_id,
             player_id,
             amount,
-        } => spin::run(wallet_id, game_id, player_id, amount, db_client).await,
-        ClientPayload::Fetch {} => return,
+        } => {
+            let res = spin::run(wallet_id, game_id, player_id, amount, db_client.clone()).await;
+            broadcast(&ws_clients, fetch::run(db_client.clone()).await).await;
+            res
+        }
+        ClientPayload::Fetch {} => fetch::run(db_client.clone()).await,
     };
 
     let res_raw = match serde_json::to_string(&res_json) {
@@ -76,12 +79,11 @@ async fn dispatch(
         Err(_) => {
             let err_msg = types::create_error(String::from("Server error!"));
             let data = serde_json::to_string(&err_msg).unwrap();
-            send(sender, data).await;
-            return;
+            return Some(data);
         }
     };
 
-    send(sender, res_raw).await;
+    Some(res_raw)
 }
 
 async fn send(sender: &Arc<Mutex<SplitSink<WebSocket, Message>>>, data: String) {
